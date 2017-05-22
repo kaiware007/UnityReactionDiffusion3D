@@ -1,0 +1,257 @@
+﻿//#pragma kernel Init
+#pragma kernel Update
+#pragma kernel Draw
+#pragma kernel AddSeed
+
+#define THREAD_NUM_X 8
+
+struct RDData
+{
+	float a;
+	float b;
+};
+
+int _TexWidth;
+int _TexHeight;
+int _TexDepth;
+float _DA;
+float _DB;
+float _Feed;
+float _K;
+float _DT;
+
+int _SeedSize;
+int _InputNum;
+
+StructuredBuffer<RDData> _BufferRead;
+RWStructuredBuffer<RDData> _BufferWrite;
+StructuredBuffer<float3> _InputBufferRead;
+
+RWTexture3D<float> _HeightMap;	// ハイトマップ
+
+// x,y,z
+//const int3 laplaceIndex[27] = {
+//	{ -1,-1,-1},{ 0,-1,-1 },{ 1,-1,-1 },
+//	{ -1,0,-1 },{ 0, 0,-1 },{ 1, 0,-1 },
+//	{ -1,1,-1 },{ 0,1,-1 },{ 1,1,-1 },
+//
+//	{ -1,-1,0 },{ 0,-1,0 },{ 1,-1,0 },
+//	{ -1,0,0 },{ 0, 0,0 },{ 1, 0,0 },
+//	{ -1,1,0 },{ 0,1,0 },{ 1,1,0 },
+//
+//	{ -1,-1,1 },{ 0,-1,1 },{ 1,-1,1 },
+//	{ -1,0,1 },{ 0, 0,1 },{ 1, 0,1 },
+//	{ -1,1,1 },{ 0,1,1 },{ 1,1,1 },
+//};
+static const int laplaceIndexX[27] = {
+	-1, 0, 1,
+	-1, 0, 1,
+	-1, 0, 1,
+
+	-1, 0, 1,
+	-1, 0, 1,
+	-1, 0, 1,
+
+	-1, 0, 1,
+	-1, 0, 1,
+	-1, 0, 1,
+};
+
+static const int laplaceIndexY[27] = {
+	-1, -1, -1,
+	0, 0, 0,
+	1, 1, 1,
+
+	-1, -1, -1,
+	0, 0, 0,
+	1, 1, 1,
+
+	-1, -1, -1,
+	0, 0, 0,
+	1, 1, 1,
+};
+
+static const int laplaceIndexZ[27] = {
+	-1, -1, -1,
+	-1, -1, -1,
+	-1, -1, -1,
+
+	0, 0, 0,
+	0, 0, 0,
+	0, 0, 0,
+
+	1, 1, 1,
+	1, 1, 1,
+	1, 1, 1,
+};
+
+static const float laplacePower[27] = {
+	0.02,	0.02,	0.02,
+	0.02,	0.1,	0.02,
+	0.02,	0.02,	0.02,
+
+	0.02,	0.1,	0.02,
+	0.1,	-1.0,	0.1,
+	0.02,	0.1,	0.02,
+
+	0.02,	0.02,	0.02,
+	0.02,	0.1,	0.02,
+	0.02,	0.02,	0.02
+};
+
+int GetIndex(int x, int y, int z) {
+	x = (x < 0) ? x + _TexWidth : x;
+	x = (x >= _TexWidth) ? x - _TexWidth : x;
+
+	y = (y < 0) ? y + _TexHeight : y;
+	y = (y >= _TexHeight) ? y - _TexHeight : y;
+
+	z = (z < 0) ? z + _TexDepth : z;
+	z = (z >= _TexDepth) ? z - _TexDepth : z;
+
+	return z * _TexWidth * _TexHeight + y * _TexWidth + x;
+}
+
+//int3 GetPosition(int idx) {
+//	int3 pos;
+//	pos.x = idx % _TexWidth;
+//	pos.y = (idx / _TexWidth) % _TexHeight;
+//	pos.z = idx / _TexWidth / _TexHeight;
+//	return pos;
+//}
+
+float LaplaceA(int x, int y, int z) {
+	float sumA = 0;
+	
+	for (int i = 0; i < 27; i++) {
+		//int3 pos = laplaceIndex[i];
+		int3 pos = int3(laplaceIndexX[i], laplaceIndexY[i], laplaceIndexZ[i]);
+		int idx = GetIndex(x + pos.x, y + pos.y, z + pos.z);
+		sumA += _BufferRead[idx].a * laplacePower[i];
+	}
+
+	//sumA += _BufferRead[GetIndex(x, y)].a * -1;
+
+	//sumA += _BufferRead[GetIndex(x - 1, y)].a * 0.2;
+	//sumA += _BufferRead[GetIndex(x + 1, y)].a * 0.2;
+	//sumA += _BufferRead[GetIndex(x, y - 1)].a * 0.2;
+	//sumA += _BufferRead[GetIndex(x, y + 1)].a * 0.2;
+
+	//sumA += _BufferRead[GetIndex(x - 1, y - 1)].a * 0.05;
+	//sumA += _BufferRead[GetIndex(x + 1, y - 1)].a * 0.05;
+	//sumA += _BufferRead[GetIndex(x + 1, y + 1)].a * 0.05;
+	//sumA += _BufferRead[GetIndex(x - 1, y + 1)].a * 0.05;
+
+	return sumA;
+}
+
+float LaplaceB(int x, int y, int z) {
+	float sumB = 0;
+
+	for (int i = 0; i < 27; i++) {
+		//int3 pos = laplaceIndex[i];
+		int3 pos = int3(laplaceIndexX[i], laplaceIndexY[i], laplaceIndexZ[i]);
+		int idx = GetIndex(x + pos.x, y + pos.y, z + pos.z);
+		sumB += _BufferRead[idx].b * laplacePower[i];
+	}
+
+	//sumB += _BufferRead[GetIndex(x, y)].b * -1;
+
+	//sumB += _BufferRead[GetIndex(x - 1, y)].b * 0.2;
+	//sumB += _BufferRead[GetIndex(x + 1, y)].b * 0.2;
+	//sumB += _BufferRead[GetIndex(x, y - 1)].b * 0.2;
+	//sumB += _BufferRead[GetIndex(x, y + 1)].b * 0.2;
+
+	//sumB += _BufferRead[GetIndex(x - 1, y - 1)].b * 0.05;
+	//sumB += _BufferRead[GetIndex(x + 1, y - 1)].b * 0.05;
+	//sumB += _BufferRead[GetIndex(x + 1, y + 1)].b * 0.05;
+	//sumB += _BufferRead[GetIndex(x - 1, y + 1)].b * 0.05;
+
+	return sumB;
+}
+
+float GetValue(int x, int y, int z) {
+	int idx = GetIndex(x, y, z);
+	float a = _BufferRead[idx].a;
+	float b = _BufferRead[idx].b;
+	return 1 - clamp(a - b, 0, 1);
+}
+
+float3 GetNormal(int x, int y, int z) {
+	float3 normal = float3(0, 0, 0);
+	float c = GetValue(x, y, z);
+	normal.x = ((GetValue(x - 1, y, z) - c) - (GetValue(x + 1, y, z) - c));
+	normal.y = ((GetValue(x, y - 1, z) - c) - (GetValue(x, y + 1, z) - c));
+	normal.z = ((GetValue(x, y, z - 1) - c) - (GetValue(x, y, z + 1) - c));
+	normal = normalize(normal) * 0.5 + 0.5;
+	return normal;
+}
+
+float3 HSV2RGB(float3 HSV)
+{
+	float4 k = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	float3 p = abs(frac(HSV.xxx + k.xyz) * 6.0 - k.www);
+	return HSV.z * lerp(k.xxx, clamp(p - k.xxx, 0.0, 1.0), HSV.y);
+}
+
+// 更新処理
+[numthreads(THREAD_NUM_X, THREAD_NUM_X, THREAD_NUM_X)]
+void Update(uint3 id : SV_DispatchThreadID)
+{
+	// 端っこは何もしない
+	//if ((id.x == 0) || (id.x == (_TexWidth - 1))) return;
+	//if ((id.y == 0) || (id.y == (_TexHeight - 1))) return;
+
+	int idx = GetIndex(id.x, id.y, id.z);
+	float a = _BufferRead[idx].a;
+	float b = _BufferRead[idx].b;
+	float abb = a * b * b;
+	_BufferWrite[idx].a = clamp(a + (_DA * LaplaceA(id.x, id.y, id.z) - abb + _Feed * (1.0 - a)), 0, 1);
+	_BufferWrite[idx].b = clamp(b + (_DB * LaplaceB(id.x, id.y, id.z) + abb - (_K + _Feed) * b), 0, 1);
+
+}
+
+// テクスチャに描画
+[numthreads(THREAD_NUM_X, THREAD_NUM_X, THREAD_NUM_X)]
+void Draw(uint3 id : SV_DispatchThreadID)
+{
+	float c = GetValue(id.x, id.y, id.z);
+
+	// height map
+	_HeightMap[id.xyz] = c;
+}
+
+// シードの追加
+[numthreads(THREAD_NUM_X, 1, 1)]
+void AddSeed(uint id : SV_DispatchThreadID)
+{
+	if (_InputNum <= id) return;
+
+	int w = _SeedSize;
+	int h = _SeedSize;
+	int d = _SeedSize;
+	float radius = _SeedSize * 0.5;
+
+	int centerX = _InputBufferRead[id].x;
+	int centerY = _InputBufferRead[id].y;
+	int centerZ = _InputBufferRead[id].z;
+
+	int startX = centerX - w / 2;
+	int startY = centerY - h / 2;
+	int startZ = centerZ - d / 2;
+
+	for (int x = 0; x < w; x++)
+	{
+		for (int y = 0; y < h; y++)
+		{
+			for (int z = 0; z < d; z++)
+			{
+				float dis = distance(float3(centerX, centerY, centerZ), float3(startX + x, startY + y, startZ + z));
+				if (dis <= radius) {
+					_BufferWrite[GetIndex((centerX + x), (centerY + y), (centerZ + z))].b = 1;
+				}
+			}
+		}
+	}
+	
+}
