@@ -12,6 +12,7 @@ public struct RDData
 public class ReactionDiffusion3D : MonoBehaviour {
     const int THREAD_NUM_X = 8;
 
+    #region public
     public int texWidth = 256;
     public int texHeight = 256;
     public int texDepth = 256;
@@ -33,7 +34,9 @@ public class ReactionDiffusion3D : MonoBehaviour {
     public ComputeShader cs;
 
     public RenderTexture heightMapTexture;
+    #endregion
 
+    #region private
     private int kernelUpdate = -1;
     private int kernelDraw = -1;
     private int kernelAddSeed = -1;
@@ -44,8 +47,8 @@ public class ReactionDiffusion3D : MonoBehaviour {
     private RDData[] bufData2;
     private Vector3[] inputData;
     private int inputIndex = 0;
-    //private List<Renderer> rendererList = new List<Renderer>();
-    
+    #endregion
+
     void ResetBuffer()
     {
         for (int x = 0; x < texWidth; x++)
@@ -167,7 +170,7 @@ public class ReactionDiffusion3D : MonoBehaviour {
 
     void AddRandomSeed(int num)
     {
-        for(int i = 0; i < num; i++)
+        for (int i = 0; i < num; i++)
         {
             AddSeed(Random.Range(0, texWidth), Random.Range(0, texHeight), Random.Range(0, texDepth));
         }
@@ -207,6 +210,12 @@ public class ReactionDiffusion3D : MonoBehaviour {
         if (Input.GetKeyDown(KeyCode.A))
         {
             AddRandomSeed(seedNum);
+        }
+
+        // 中心に1つ追加
+        if (Input.GetKeyDown(KeyCode.C))
+        {
+            AddSeed(texWidth / 2, texHeight / 2, texDepth / 2);
         }
 
         AddSeedBuffer();

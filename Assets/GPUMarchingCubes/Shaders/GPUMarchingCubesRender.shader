@@ -50,19 +50,18 @@
 
 		sampler3D _MainTex;
 
-		// test
+		// simplex noise test
 		//float Sample(float x, float y, float z) {
 		//	return snoise(float3(x + _Time.y, y, z) * _SampleScale);	// test
 		//}
 
 		float Sample(float x, float y, float z) {
-			//float4 c = tex3D(_MainTex, float3(x, y, z) * _SampleScale);
+			
 			float4 uv = float4(x / _Width, y / _Height, z / _Depth, 0) * _SampleScale;
-			if (distance(uv.xyz, float3(0.5, 0.5, 0.5)) < 0.25) return 0;	// 中心部だけくり抜き
+			//if (distance(uv.xyz, float3(0.5, 0.5, 0.5)) < 0.25) return 0;	// 中心部だけくり抜き
 
-			float4 c = tex3Dlod(_MainTex, float4(x / _Width, y / _Height, z / _Depth, 0) * _SampleScale);
-			return c.r;
-			//return snoise(float3(x + _Time.y, y, z) * _SampleScale);	// test
+			float4 c = tex3Dlod(_MainTex, uv);
+			return c.r;			
 		}
 
 		float3 GetPosition(uint id) {

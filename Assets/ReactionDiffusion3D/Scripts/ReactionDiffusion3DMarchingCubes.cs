@@ -23,8 +23,8 @@ public class ReactionDiffusion3DMarchingCubes : ReactionDiffusion3DRenderer
         if (!Application.isPlaying)
             return;
 
-        Vector3 whd = new Vector3(march.Width, march.height, march.depth);
-        Vector3 center = transform.position + whd * march.renderScale * 0.5f;
+        Vector3 whd = new Vector3(march.Width, march.height, march.depth) * march.renderScale;
+        Vector3 center = transform.position + whd * 0.5f;
         Gizmos.DrawWireCube(center, whd);
     }
 }

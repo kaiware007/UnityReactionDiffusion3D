@@ -30,19 +30,6 @@ StructuredBuffer<float3> _InputBufferRead;
 RWTexture3D<float> _HeightMap;	// ハイトマップ
 
 // x,y,z
-//const int3 laplaceIndex[27] = {
-//	{ -1,-1,-1},{ 0,-1,-1 },{ 1,-1,-1 },
-//	{ -1,0,-1 },{ 0, 0,-1 },{ 1, 0,-1 },
-//	{ -1,1,-1 },{ 0,1,-1 },{ 1,1,-1 },
-//
-//	{ -1,-1,0 },{ 0,-1,0 },{ 1,-1,0 },
-//	{ -1,0,0 },{ 0, 0,0 },{ 1, 0,0 },
-//	{ -1,1,0 },{ 0,1,0 },{ 1,1,0 },
-//
-//	{ -1,-1,1 },{ 0,-1,1 },{ 1,-1,1 },
-//	{ -1,0,1 },{ 0, 0,1 },{ 1, 0,1 },
-//	{ -1,1,1 },{ 0,1,1 },{ 1,1,1 },
-//};
 static const int laplaceIndexX[27] = {
 	-1, 0, 1,
 	-1, 0, 1,
@@ -112,36 +99,14 @@ int GetIndex(int x, int y, int z) {
 	return z * _TexWidth * _TexHeight + y * _TexWidth + x;
 }
 
-//int3 GetPosition(int idx) {
-//	int3 pos;
-//	pos.x = idx % _TexWidth;
-//	pos.y = (idx / _TexWidth) % _TexHeight;
-//	pos.z = idx / _TexWidth / _TexHeight;
-//	return pos;
-//}
-
 float LaplaceA(int x, int y, int z) {
 	float sumA = 0;
 	
 	for (int i = 0; i < 27; i++) {
-		//int3 pos = laplaceIndex[i];
 		int3 pos = int3(laplaceIndexX[i], laplaceIndexY[i], laplaceIndexZ[i]);
 		int idx = GetIndex(x + pos.x, y + pos.y, z + pos.z);
 		sumA += _BufferRead[idx].a * laplacePower[i];
 	}
-
-	//sumA += _BufferRead[GetIndex(x, y)].a * -1;
-
-	//sumA += _BufferRead[GetIndex(x - 1, y)].a * 0.2;
-	//sumA += _BufferRead[GetIndex(x + 1, y)].a * 0.2;
-	//sumA += _BufferRead[GetIndex(x, y - 1)].a * 0.2;
-	//sumA += _BufferRead[GetIndex(x, y + 1)].a * 0.2;
-
-	//sumA += _BufferRead[GetIndex(x - 1, y - 1)].a * 0.05;
-	//sumA += _BufferRead[GetIndex(x + 1, y - 1)].a * 0.05;
-	//sumA += _BufferRead[GetIndex(x + 1, y + 1)].a * 0.05;
-	//sumA += _BufferRead[GetIndex(x - 1, y + 1)].a * 0.05;
-
 	return sumA;
 }
 
@@ -149,24 +114,10 @@ float LaplaceB(int x, int y, int z) {
 	float sumB = 0;
 
 	for (int i = 0; i < 27; i++) {
-		//int3 pos = laplaceIndex[i];
 		int3 pos = int3(laplaceIndexX[i], laplaceIndexY[i], laplaceIndexZ[i]);
 		int idx = GetIndex(x + pos.x, y + pos.y, z + pos.z);
 		sumB += _BufferRead[idx].b * laplacePower[i];
 	}
-
-	//sumB += _BufferRead[GetIndex(x, y)].b * -1;
-
-	//sumB += _BufferRead[GetIndex(x - 1, y)].b * 0.2;
-	//sumB += _BufferRead[GetIndex(x + 1, y)].b * 0.2;
-	//sumB += _BufferRead[GetIndex(x, y - 1)].b * 0.2;
-	//sumB += _BufferRead[GetIndex(x, y + 1)].b * 0.2;
-
-	//sumB += _BufferRead[GetIndex(x - 1, y - 1)].b * 0.05;
-	//sumB += _BufferRead[GetIndex(x + 1, y - 1)].b * 0.05;
-	//sumB += _BufferRead[GetIndex(x + 1, y + 1)].b * 0.05;
-	//sumB += _BufferRead[GetIndex(x - 1, y + 1)].b * 0.05;
-
 	return sumB;
 }
 
@@ -201,6 +152,7 @@ void Update(uint3 id : SV_DispatchThreadID)
 	// 端っこは何もしない
 	//if ((id.x == 0) || (id.x == (_TexWidth - 1))) return;
 	//if ((id.y == 0) || (id.y == (_TexHeight - 1))) return;
+	//if ((id.z == 0) || (id.z == (_TexDepth - 1))) return;
 
 	int idx = GetIndex(id.x, id.y, id.z);
 	float a = _BufferRead[idx].a;

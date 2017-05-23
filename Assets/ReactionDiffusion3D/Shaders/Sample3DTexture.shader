@@ -3,6 +3,7 @@
 Shader "DX11/Sample 3D Texture" {
 	Properties{
 		_MainTex("Texture", 3D) = "" {}
+		_OffsetUV("UV Offset", Vector) = (0,0,0,0)
 	}
 	SubShader{
 		Pass{
@@ -26,20 +27,20 @@ Shader "DX11/Sample 3D Texture" {
 				float3 uv : TEXCOORD0;
 			};
 
+			float3 _OffsetUV;
 
 			ps_input vert(vs_input v)
 			{
 				ps_input o;
 				o.pos = UnityObjectToClipPos(v.vertex);
-				o.uv = v.vertex.xyz;
+				o.uv = v.vertex.xyz + _OffsetUV;
 				return o;
 			}
 
 			sampler3D _MainTex;
-
+			
 			float4 frag(ps_input i) : COLOR
 			{
-				//return float4(1,0,0,tex3D(_MainTex, i.uv).r);
 				return tex3D(_MainTex, i.uv);
 			}
 
