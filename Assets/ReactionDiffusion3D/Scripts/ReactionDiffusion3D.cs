@@ -37,45 +37,39 @@ public class ReactionDiffusion3D : MonoBehaviour {
     #endregion
 
     #region private
+    private int kernelClear = -1;
     private int kernelUpdate = -1;
     private int kernelDraw = -1;
     private int kernelAddSeed = -1;
+    private int kernelDellSeed = -1;
 
     private ComputeBuffer[] buffers;
-    private ComputeBuffer inputBuffer;
+    private ComputeBuffer addInputBuffer;
+    private ComputeBuffer dellInputBuffer;
     private RDData[] bufData;
     private RDData[] bufData2;
-    private Vector3[] inputData;
-    private int inputIndex = 0;
+    private Vector3[] addInputData;
+    private Vector3[] dellInputData;
+    private int addInputIndex = 0;
+    private int dellInputIndex = 0;
     #endregion
 
     void ResetBuffer()
     {
-        for (int x = 0; x < texWidth; x++)
+        for (int i = 0; i < buffers.Length; i++)
         {
-            for (int y = 0; y < texHeight; y++)
-            {
-                for (int z = 0; z < texDepth; z++)
-                {
-                    int idx = x + y * texWidth + z * texWidth * texHeight;
-                    bufData[idx].a = 1;
-                    bufData[idx].b = 0;
-
-                    bufData2[idx].a = 1;
-                    bufData2[idx].b = 0;
-                }
-            }
+            cs.SetBuffer(kernelClear, "_BufferWrite", buffers[i]);
+            cs.Dispatch(kernelClear, Mathf.CeilToInt((float)texWidth / THREAD_NUM_X), Mathf.CeilToInt((float)texHeight / THREAD_NUM_X), Mathf.CeilToInt((float)texDepth / THREAD_NUM_X));
         }
-
-        buffers[0].SetData(bufData);
-        buffers[1].SetData(bufData2);
     }
 
     void Initialize()
     {
+        kernelClear = cs.FindKernel("Clear");
         kernelUpdate = cs.FindKernel("Update");
         kernelDraw = cs.FindKernel("Draw");
         kernelAddSeed = cs.FindKernel("AddSeed");
+        kernelDellSeed = cs.FindKernel("DellSeed");
 
         heightMapTexture = CreateTexture(texWidth, texHeight, texDepth);
 
@@ -96,9 +90,12 @@ public class ReactionDiffusion3D : MonoBehaviour {
 
         ResetBuffer();
 
-        inputData = new Vector3[inputMax];
-        inputIndex = 0;
-        inputBuffer = new ComputeBuffer(inputMax, Marshal.SizeOf(typeof(Vector3)));
+        addInputData = new Vector3[inputMax];
+        addInputIndex = 0;
+        addInputBuffer = new ComputeBuffer(inputMax, Marshal.SizeOf(typeof(Vector3)));
+        dellInputData = new Vector3[inputMax];
+        dellInputIndex = 0;
+        dellInputBuffer = new ComputeBuffer(inputMax, Marshal.SizeOf(typeof(Vector3)));
     }
 
     RenderTexture CreateTexture(int width, int height, int depth)
@@ -116,9 +113,9 @@ public class ReactionDiffusion3D : MonoBehaviour {
 
     void UpdateBuffer()
     {
-        cs.SetInt("_TexWidth", texWidth);
-        cs.SetInt("_TexHeight", texHeight);
-        cs.SetInt("_TexDepth", texDepth);
+        //cs.SetInt("_TexWidth", texWidth);
+        //cs.SetInt("_TexHeight", texHeight);
+        //cs.SetInt("_TexDepth", texDepth);
         cs.SetFloat("_DA", da);
         cs.SetFloat("_DB", db);
         cs.SetFloat("_Feed", f);
@@ -142,29 +139,29 @@ public class ReactionDiffusion3D : MonoBehaviour {
 
     void AddSeedBuffer()
     {
-        if(inputIndex > 0)
+        if(addInputIndex > 0)
         {
-            inputBuffer.SetData(inputData);
-            cs.SetInt("_InputNum", inputIndex);
+            addInputBuffer.SetData(addInputData);
+            cs.SetInt("_InputNum", addInputIndex);
             cs.SetInt("_TexWidth", texWidth);
             cs.SetInt("_TexHeight", texHeight);
             cs.SetInt("_TexDepth", texDepth);
             cs.SetInt("_SeedSize", seedSize);
-            cs.SetBuffer(kernelAddSeed, "_InputBufferRead", inputBuffer);
+            cs.SetBuffer(kernelAddSeed, "_InputBufferRead", addInputBuffer);
             cs.SetBuffer(kernelAddSeed, "_BufferWrite", buffers[0]);    // update前なので0
-            cs.Dispatch(kernelAddSeed, Mathf.CeilToInt((float)inputIndex / (float)THREAD_NUM_X), 1, 1);
-            inputIndex = 0;
+            cs.Dispatch(kernelAddSeed, Mathf.CeilToInt((float)addInputIndex / (float)THREAD_NUM_X), 1, 1);
+            addInputIndex = 0;
         }
     }
 
     void AddSeed(int x, int y, int z)
     {
-        if(inputIndex < inputMax)
+        if(addInputIndex < inputMax)
         {
-            inputData[inputIndex].x = x;
-            inputData[inputIndex].y = y;
-            inputData[inputIndex].z = z;
-            inputIndex++;
+            addInputData[addInputIndex].x = x;
+            addInputData[addInputIndex].y = y;
+            addInputData[addInputIndex].z = z;
+            addInputIndex++;
         }
     }
 
@@ -173,6 +170,42 @@ public class ReactionDiffusion3D : MonoBehaviour {
         for (int i = 0; i < num; i++)
         {
             AddSeed(Random.Range(0, texWidth), Random.Range(0, texHeight), Random.Range(0, texDepth));
+        }
+    }
+
+    void DellSeedBuffer()
+    {
+        if (dellInputIndex > 0)
+        {
+            dellInputBuffer.SetData(dellInputData);
+            cs.SetInt("_InputNum", dellInputIndex);
+            cs.SetInt("_TexWidth", texWidth);
+            cs.SetInt("_TexHeight", texHeight);
+            cs.SetInt("_TexDepth", texDepth);
+            cs.SetInt("_SeedSize", seedSize);
+            cs.SetBuffer(kernelDellSeed, "_InputBufferRead", dellInputBuffer);
+            cs.SetBuffer(kernelDellSeed, "_BufferWrite", buffers[0]);    // update前なので0
+            cs.Dispatch(kernelDellSeed, Mathf.CeilToInt((float)dellInputIndex / (float)THREAD_NUM_X), 1, 1);
+            dellInputIndex = 0;
+        }
+    }
+
+    void DellSeed(int x, int y, int z)
+    {
+        if (dellInputIndex < inputMax)
+        {
+            dellInputData[dellInputIndex].x = x;
+            dellInputData[dellInputIndex].y = y;
+            dellInputData[dellInputIndex].z = z;
+            dellInputIndex++;
+        }
+    }
+
+    void DellRandomSeed(int num)
+    {
+        for (int i = 0; i < num; i++)
+        {
+            DellSeed(Random.Range(0, texWidth), Random.Range(0, texHeight), Random.Range(0, texDepth));
         }
     }
 
@@ -218,7 +251,20 @@ public class ReactionDiffusion3D : MonoBehaviour {
             AddSeed(texWidth / 2, texHeight / 2, texDepth / 2);
         }
 
+        // 削る
+        if (Input.GetKeyDown(KeyCode.D))
+        {
+            DellRandomSeed(seedNum);
+        }
+
+        // 中心1つ削る
+        if (Input.GetKeyDown(KeyCode.V))
+        {
+            DellSeed(texWidth / 2, texHeight / 2, texDepth / 2);
+        }
+
         AddSeedBuffer();
+        DellSeedBuffer();
 
         for (int i = 0; i < speed; i++)
         {
@@ -240,10 +286,15 @@ public class ReactionDiffusion3D : MonoBehaviour {
                 buffers[i] = null;
             }
         }
-        if(inputBuffer != null)
+        if(addInputBuffer != null)
         {
-            inputBuffer.Release();
-            inputBuffer = null;
+            addInputBuffer.Release();
+            addInputBuffer = null;
+        }
+        if (dellInputBuffer != null)
+        {
+            dellInputBuffer.Release();
+            dellInputBuffer = null;
         }
     }
 }

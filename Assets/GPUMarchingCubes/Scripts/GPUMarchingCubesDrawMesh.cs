@@ -26,19 +26,18 @@ public class GPUMarchingCubesDrawMesh : MonoBehaviour {
     [Range(0, 1)]
     public float glossiness = 0.5f;
 
+    public ReactionDiffusion3D reactionDiffuse;
     #endregion
 
     #region private
     int vertexMax = 0;
     Mesh[] meshs = null;
-    Material[] materials = null;
-
-    ReactionDiffusion3D reactionDiffuse;
+    Material[] materials = null;    
     #endregion
 
     void Initialize()
     {
-        reactionDiffuse = GetComponent<ReactionDiffusion3D>();
+        //reactionDiffuse = GetComponent<ReactionDiffusion3D>();
 
         vertexMax = Width * height * depth;
         
@@ -56,6 +55,7 @@ public class GPUMarchingCubesDrawMesh : MonoBehaviour {
         meshs = new Mesh[meshNum];
         materials = new Material[meshNum];
 
+        //Bounds bounds = new Bounds(transform.position, new Vector3(Width, height, depth) * renderScale);
         Bounds bounds = new Bounds(transform.position, new Vector3(Width, height, depth) * renderScale);
 
         int id = 0;
@@ -84,6 +84,9 @@ public class GPUMarchingCubesDrawMesh : MonoBehaviour {
 
     void RenderMesh()
     {
+        Vector3 halfSize = new Vector3(Width, height, depth) * renderScale * 0.5f;
+        Matrix4x4 trs = Matrix4x4.TRS(transform.position, transform.rotation, transform.localScale);
+        //Matrix4x4 trs = transform.localToWorldMatrix;
         for (int i = 0; i < meshs.Length; i++)
         //int i = 2;
         {
@@ -97,9 +100,10 @@ public class GPUMarchingCubesDrawMesh : MonoBehaviour {
             materials[i].SetFloat("_Metallic", metallic);
             materials[i].SetFloat("_Glossiness", glossiness);
             materials[i].SetVector("_LightPos", lightPos);
+            materials[i].SetVector("_HalfSize", halfSize);
             materials[i].SetColor("_DiffuseColor", DiffuseColor);
             materials[i].SetColor("_SpecularColor", SpecularColor);
-
+            materials[i].SetMatrix("_Matrix", trs);
             materials[i].SetTexture("_MainTex", reactionDiffuse.heightMapTexture);
             Graphics.DrawMesh(meshs[i], Matrix4x4.identity, materials[i], 0);
         }

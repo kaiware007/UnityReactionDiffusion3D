@@ -10,7 +10,7 @@ public class ReactionDiffusion3DMarchingCubes : ReactionDiffusion3DRenderer
     protected override void Initialize()
     {
         base.Initialize();
-        march = GetComponent<GPUMarchingCubes>();
+        march = GetComponentInChildren<GPUMarchingCubes>();
     }
 
     protected override void UpdateMaterial()
@@ -20,11 +20,11 @@ public class ReactionDiffusion3DMarchingCubes : ReactionDiffusion3DRenderer
 
     private void OnDrawGizmos()
     {
-        if (!Application.isPlaying)
+        if ((!Application.isPlaying)||(march == null))
             return;
 
         Vector3 whd = new Vector3(march.Width, march.height, march.depth) * march.renderScale;
-        Vector3 center = transform.position + whd * 0.5f;
+        Vector3 center = transform.position;
         Gizmos.DrawWireCube(center, whd);
     }
 }
