@@ -48,5 +48,7 @@ public class GPUMarchingCubes : MonoBehaviour {
         mat.SetFloat("_Threashold", threashold);
         mat.SetVector("_LightPos", lightPos);
         Graphics.DrawProcedural(MeshTopology.Points, vertexMax, 0);
+        mat.SetPass(1);
+        Graphics.DrawProcedural(MeshTopology.Points, vertexMax, 0);
     }
 }
