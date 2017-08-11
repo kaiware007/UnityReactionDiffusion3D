@@ -20,7 +20,9 @@ public class GPUMarchingCubesDrawMesh : MonoBehaviour {
     public Vector3 lightPos = new Vector3(0,2,0);
 
     public Color DiffuseColor = Color.green;
-    public Color SpecularColor = Color.white;
+    public Color EmissionColor = Color.black;
+    public float EmissionIntensity = 0;
+
     [Range(0,1)]
     public float metallic = 0;
     [Range(0, 1)]
@@ -49,7 +51,7 @@ public class GPUMarchingCubesDrawMesh : MonoBehaviour {
     void CreateMesh()
     {
         int vertNum = 65534;
-        int meshNum = vertexMax / vertNum;
+        int meshNum = Mathf.CeilToInt((float)vertexMax / vertNum);
         Debug.Log("meshNum " + meshNum );
 
         meshs = new Mesh[meshNum];
@@ -99,10 +101,12 @@ public class GPUMarchingCubesDrawMesh : MonoBehaviour {
             materials[i].SetFloat("_Threashold", threashold);
             materials[i].SetFloat("_Metallic", metallic);
             materials[i].SetFloat("_Glossiness", glossiness);
+            materials[i].SetFloat("_EmissionIntensity", EmissionIntensity);
+            
             materials[i].SetVector("_LightPos", lightPos);
             materials[i].SetVector("_HalfSize", halfSize);
             materials[i].SetColor("_DiffuseColor", DiffuseColor);
-            materials[i].SetColor("_SpecularColor", SpecularColor);
+            materials[i].SetColor("_EmissionColor", EmissionColor);
             materials[i].SetMatrix("_Matrix", trs);
             materials[i].SetTexture("_MainTex", reactionDiffuse.heightMapTexture);
             Graphics.DrawMesh(meshs[i], Matrix4x4.identity, materials[i], 0);
