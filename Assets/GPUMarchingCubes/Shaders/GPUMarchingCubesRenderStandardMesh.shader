@@ -57,8 +57,8 @@
 			float4 pos		: SV_POSITION;
 			float3 normal		: NORMAL;
 			float4 worldPos		: TEXCOORD0;
-			float3 lightDir : TEXCOORD1;
-			float3 viewDir  : TEXCOORD2;
+			//float3 lightDir : TEXCOORD1;
+			//float3 viewDir  : TEXCOORD2;
 			//LIGHTING_COORDS(3, 4)
 			half3 sh : TEXCOORD3; // SH
 		};
@@ -110,6 +110,7 @@
 			return c.r;
 		}
 
+		// オフセット計算（2値の間の閾値(desired)に近い点を計算する）
 		float getOffset(float val1, float val2, float desired) {
 			float delta = val2 - val1;
 			if (delta == 0.0) {
@@ -118,10 +119,11 @@
 			return (desired - val1) / delta;
 		}
 
+		// 法線計算
 		float3 getNormal(float fX, float fY, float fZ)
 		{
 			float3 normal;
-			float offset = 1.0;	// 0.5
+			float offset = 1.0;	// 隣のグリッド
 
 			normal.x = Sample(fX - offset, fY, fZ) - Sample(fX + offset, fY, fZ);
 			normal.y = Sample(fX, fY - offset, fZ) - Sample(fX, fY + offset, fZ);
@@ -176,6 +178,7 @@
 			float3 pos = input[0].pos.xyz;
 			float3 defpos = pos;
 
+			// グリッドの８つの角のスカラー値を取得
 			for (i = 0; i < 8; i++) {
 				cubeValue[i] = Sample(
 					pos.x + vertexOffsetX[i],
@@ -189,6 +192,7 @@
 
 			int flagIndex = 0;
 
+			// グリッドの８つの角の値が閾値を超えているかチェック
 			for (i = 0; i < 8; i++) {
 				if (cubeValue[i] <= _Threashold) {
 					flagIndex |= (1 << i);
@@ -197,6 +201,7 @@
 
 			int edgeFlags = cubeEdgeFlags[flagIndex];
 
+			// 空か完全に満たされている場合は何も描画しない
 			if ((edgeFlags == 0) || (edgeFlags == 255)) {
 				return;
 			}
@@ -205,8 +210,10 @@
 			float3 vertex;
 			for (i = 0; i < 12; i++) {
 				if ((edgeFlags & (1 << i)) != 0) {
+					// 角同士の閾値のオフセットを取得
 					offset = getOffset(cubeValue[edgeConnectionX[i]], cubeValue[edgeConnectionY[i]], _Threashold);
 
+					// オフセットを元に頂点の座標を補完
 					vertex.x = (vertexOffsetX[edgeConnectionX[i]] + offset * edgeDirectionX[i]);
 					vertex.y = (vertexOffsetY[edgeConnectionX[i]] + offset * edgeDirectionY[i]);
 					vertex.z = (vertexOffsetZ[edgeConnectionX[i]] + offset * edgeDirectionZ[i]);
@@ -215,43 +222,38 @@
 					edgeVertices[i].y = pos.y + vertex.y * _Scale;
 					edgeVertices[i].z = pos.z + vertex.z * _Scale;
 
+					// 法線計算（Sampleし直すため、スケールを掛ける前の頂点座標が必要）
 					edgeNormals[i] = getNormal(defpos.x + vertex.x, defpos.y + vertex.y, defpos.z + vertex.z);
 				}
 			}
 
+			// 頂点を連結してポリゴンを作成
 			int vindex = 0;
 			int findex = 0;
+			// 最大４つの三角形ができる
 			for (i = 0; i < 5; i++) {
 				findex = flagIndex * 16 + 3 * i;
 				if (triangleConnectionTable[findex] < 0)
 					break;
 
-				// Normal
-				float3 v0 = edgeVertices[triangleConnectionTable[findex + 1]] - edgeVertices[triangleConnectionTable[findex]];
-				float3 v1 = edgeVertices[triangleConnectionTable[findex + 2]] - edgeVertices[triangleConnectionTable[findex]];
+				// Normal(flat shading)
+				//float3 v0 = edgeVertices[triangleConnectionTable[findex + 1]] - edgeVertices[triangleConnectionTable[findex]];
+				//float3 v1 = edgeVertices[triangleConnectionTable[findex + 2]] - edgeVertices[triangleConnectionTable[findex]];
 				//float3 norm = UnityObjectToWorldNormal(normalize(cross(v0, v1)));
-				//float3 defnorm = UnityObjectToWorldNormal(normalize(cross(v0, v1)));
 
+				// 三角形を作る
 				for (j = 0; j < 3; j++) {
 					vindex = triangleConnectionTable[findex + j];
 
+					// Transform行列を掛けてワールド座標に変換
 					float4 ppos = mul(_Matrix, float4(edgeVertices[vindex], 1));
 					o.pos = UnityObjectToClipPos(ppos);
-					float3 norm;
-					norm = UnityObjectToWorldNormal(normalize(edgeNormals[vindex]));
-					//if ((abs(edgeNormals[vindex].x) <= 0.001) &&
-					//	(abs(edgeNormals[vindex].y) <= 0.001) &&
-					//	(abs(edgeNormals[vindex].z) <= 0.001))
-					//{
-					//	norm = defnorm;
-					//}
-					//else {
-					//	norm = UnityObjectToWorldNormal(normalize(edgeNormals[vindex]));
-					//}
+					// 滑らかシェーディング
+					float3 norm = UnityObjectToWorldNormal(normalize(edgeNormals[vindex]));
 					o.normal = normalize(mul(_Matrix, float4(norm,0)));
 
-					o.lightDir = normalize(WorldSpaceLightDir(ppos));
-					o.viewDir = normalize(WorldSpaceViewDir(ppos));
+					//o.lightDir = normalize(WorldSpaceLightDir(ppos));
+					//o.viewDir = normalize(WorldSpaceViewDir(ppos));
 					//TRANSFER_VERTEX_TO_FRAGMENT(o);
 
 
@@ -418,8 +420,8 @@
 					break;
 
 				// Normal
-				float3 v0 = edgeVertices[triangleConnectionTable[findex + 1]] - edgeVertices[triangleConnectionTable[findex]];
-				float3 v1 = edgeVertices[triangleConnectionTable[findex + 2]] - edgeVertices[triangleConnectionTable[findex]];
+				//float3 v0 = edgeVertices[triangleConnectionTable[findex + 1]] - edgeVertices[triangleConnectionTable[findex]];
+				//float3 v1 = edgeVertices[triangleConnectionTable[findex + 2]] - edgeVertices[triangleConnectionTable[findex]];
 				//float3 norm = normalize(cross(v0, v1));
 				//float3 defnorm = UnityObjectToWorldNormal(normalize(cross(v0, v1)));
 
